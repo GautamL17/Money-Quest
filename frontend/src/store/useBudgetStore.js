@@ -1,6 +1,9 @@
 // src/stores/budgetStore.js
 import { create } from "zustand";
 import { getBudgets, createBudget, updateBudget, deleteBudget } from "../api/budgets";
+// import axios from "axios";
+import api from "../api/axios";
+
 
 const useBudgetStore = create((set) => ({
   budgets: [],
@@ -45,7 +48,47 @@ const useBudgetStore = create((set) => ({
       set({ error: err.response?.data?.message || "Failed to delete budget" });
     }
   },
+
+  // addSpending: async (budgetId, categoryName, amount) => {
+  //   set({ loading: true });
+  //   try {
+  //     const { data } = await axios.post(`/api/budgets/${budgetId}/spend`, {
+  //       categoriesName: categoryName,
+  //       amount,
+  //     });
+  //     // Replace the old budget with the new, updated one from the server
+  //     set((state) => ({
+  //       budgets: state.budgets.map((b) => (b._id === budgetId ? data : b)),
+  //       loading: false,
+  //     }));
+  //   } catch (err) {
+  //     set({
+  //       error: err.response?.data?.message || "Failed to add spending",
+  //       loading: false,
+  //     });
+  //   }
+  // },
+
+
+  addSpending: async (budgetId, categoryName, amount) => {
+  set({ loading: true });
+  try {
+    const { data } = await api.post(`/budgets/${budgetId}/spend`, {
+      categoryName,
+      amount,
+    });
+    set((state) => ({
+      budgets: state.budgets.map((b) => (b._id === budgetId ? data : b)),
+      loading: false,
+    }));
+  } catch (err) {
+    set({
+      error: err.response?.data?.message || "Failed to add spending",
+      loading: false,
+    });
+  }
+},
+
 }));
 
 export default useBudgetStore;
- 

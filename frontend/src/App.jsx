@@ -10,6 +10,7 @@ import Profile from './pages/Dashboard/Profile.jsx';
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import DashboardLayout from "./components/DashboardLayout.jsx";  // <-- new layout
 import './index.css';
+import Stats from "./pages/Dashboard/Stats.jsx";
 
 function App() {
   return (
@@ -33,6 +34,7 @@ function App() {
         <Route path="budget" element={<Budget />} />
         <Route path="features" element={<Features />} />
         <Route path="profile" element={<Profile />} />
+        <Route path="stats" element={<Stats/>} />
       </Route>
 
       {/* fallback (404) */}
