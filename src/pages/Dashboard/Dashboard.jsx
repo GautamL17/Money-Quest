@@ -1,6 +1,7 @@
 import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { PlusCircle, MinusCircle, Target, Wallet, Bell } from "lucide-react";
-
+import BudgetOverview from "./BudgetOverview";
+import BudgetForm from './BudgetForm';
 const Dashboard = () => {
   const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
 

@@ -1,17 +1,18 @@
 // controllers/budgetController.js
 import Budget from "../models/budget.js";
 import { calculateBudgetStats } from "../helpers/budgetHelper.js";
-import asyncHandler from 'express-async-handler';
+import asyncHandler from "express-async-handler";
 
+// Create budget
 export const createBudget = async (req, res) => {
   try {
-    const { categories, totalBudget, period, month, week } = req.body;
+    const { categories, totalBudget, period, month, week, salary, savingsGoal } = req.body;
 
     if (!categories || !totalBudget || !period) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
-    // Normalize categories so schema gets { name, allocated, spent }
+    // Normalize categories
     const normalizedCategories = categories.map((c) =>
       typeof c === "string"
         ? { name: c, allocated: 0, spent: 0 }
@@ -25,40 +26,43 @@ export const createBudget = async (req, res) => {
       totalSpent: 0,
       remaining: totalBudget,
       period,
-      month: period === "monthly" ? month : undefined, // ✅ only set if monthly
-      week: period === "weekly" ? week : undefined,   // ✅ only set if weekly
+      salary: salary || 0,
+      savingsGoal: savingsGoal || 0,
+      savings: salary ? salary : 0,
+      month: period === "monthly" ? month : undefined,
+      week: period === "weekly" ? week : undefined,
     });
 
-    const savedBudget = await budget.save();
+    const updatedBudget = calculateBudgetStats(budget);
+    const savedBudget = await updatedBudget.save();
     res.status(201).json(savedBudget);
   } catch (err) {
     res.status(400).json({ message: err.message });
   }
 };
 
-
-
+// Get all budgets
 export const getBudgets = async (req, res) => {
   try {
     const budgets = await Budget.find({ user: req.user.id });
-    res.json(budgets);
+    res.json(budgets.map(calculateBudgetStats));
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-
+// Get single budget
 export const getBudgetById = async (req, res) => {
   try {
     const budget = await Budget.findOne({ _id: req.params.id, user: req.user.id });
     if (!budget) return res.status(404).json({ message: "Budget not found" });
-    res.json(budget);
+    res.json(calculateBudgetStats(budget));
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-
+// Update budget
 export const updateBudget = async (req, res) => {
   try {
     let budget = await Budget.findOne({ _id: req.params.id, user: req.user.id });
@@ -74,7 +78,7 @@ export const updateBudget = async (req, res) => {
   }
 };
 
-
+// Delete budget
 export const deleteBudget = async (req, res) => {
   try {
     const budget = await Budget.findOneAndDelete({ _id: req.params.id, user: req.user.id });
@@ -85,43 +89,19 @@ export const deleteBudget = async (req, res) => {
   }
 };
 
-
-// export const addSpending = async (req, res) => {
-//   try {
-//     const { categoriesName, amount } = req.body;
-//     const budget = await Budget.findOne({ _id: req.params.id, user: req.user.id });
-
-//     if (!budget) return res.status(404).json({ message: "Budget not found" });
-
-//     const category = budget.categories.find(c => c.name === categoriesName);
-//     if (!category) return res.status(404).json({ message: "Category not found" });
-
-//     category.spent += amount;
-
-//     calculateBudgetStats(budget);
-//     await budget.save();
-
-//     res.json(budget);
-//   } catch (err) {
-//     res.status(400).json({ message: err.message });
-//   }
-// };
-
-
+// Get summary
 export const getBudgetSummary = async (req, res) => {
   try {
     const budgets = await Budget.find({ user: req.user.id }).sort({ createdAt: -1 });
 
-    const summary = budgets.map(b => {
+    const summary = budgets.map((b) => {
       let label;
       if (b.period === "monthly" && b.month) {
-        // Convert month number to name (1 -> January)
         const monthName = new Date(2000, b.month - 1).toLocaleString("default", { month: "long" });
         label = `${monthName} ${b.createdAt.getFullYear()}`;
       } else if (b.period === "weekly" && b.week) {
         label = `Week ${b.week} - ${b.createdAt.getFullYear()}`;
       } else {
-        // fallback
         label = `${b.period} budget (${b.createdAt.toDateString()})`;
       }
 
@@ -132,6 +112,8 @@ export const getBudgetSummary = async (req, res) => {
         totalBudget: b.totalBudget,
         totalSpent: b.totalSpent,
         remaining: b.remaining,
+        salary: b.salary,
+        savings: b.savings,
         savingsGoal: b.savingsGoal,
       };
     });
@@ -142,43 +124,51 @@ export const getBudgetSummary = async (req, res) => {
   }
 };
 
-
-
-// @desc    Add spending to a budget
-// @route   POST /api/budgets/:id/spend
-// @access  Private
+// Add spending
 export const addSpending = asyncHandler(async (req, res) => {
-  const { categoryName, amount } = req.body;
+  const { category, amount, description } = req.body;
   const { id } = req.params;
 
-  // const budget = await Budget.findById(id);
-  const budget = await Budget.findOne({ _id: id, user: req.user.id });
-
-
-  if (!budget) {
-    res.status(404);
-    throw new Error('Budget not found');
+  // ✅ Validate input early
+  if (!category || !amount) {
+    return res.status(400).json({ message: "Category and amount are required" });
   }
 
-  // Find the category and update its spent amount
+  const budget = await Budget.findOne({ _id: id, user: req.user.id });
+  if (!budget) {
+    return res.status(404).json({ message: "Budget not found" });
+  }
+
+  if (!budget.categories || budget.categories.length === 0) {
+    return res.status(400).json({ message: "This budget has no categories" });
+  }
+
+  // ✅ Case-insensitive + trim safe match
+  const requestedCategory = category.trim().toLowerCase();
   const categoryToUpdate = budget.categories.find(
-    (cat) => cat.name === categoryName
+    (cat) => cat?.name?.trim().toLowerCase() === requestedCategory
   );
 
   if (!categoryToUpdate) {
-    res.status(404);
-    throw new Error('Category not found');
+    return res.status(404).json({ message: `Category "${category}" not found in this budget` });
   }
 
-  // Update spent amount for the category
-  categoryToUpdate.spent += amount;
+  // ✅ Ensure `spent` exists
+  if (typeof categoryToUpdate.spent !== "number") {
+    categoryToUpdate.spent = 0;
+  }
 
-  // Recalculate totalSpent and remaining
-  budget.totalSpent += amount;
-  budget.remaining = budget.totalBudget - budget.totalSpent;
+  categoryToUpdate.spent += Number(amount);
 
-  // Save the updated budget
+  budget.transactions.push({
+    category: categoryToUpdate.name,
+    amount: Number(amount),
+    description: description?.trim() || "",
+    createdAt: new Date(), // ✅ good to store a timestamp
+  });
+
+  calculateBudgetStats(budget);
+
   await budget.save();
-
   res.status(200).json(budget);
 });

@@ -1,29 +1,90 @@
+// models/budget.js
 import mongoose from "mongoose";
 
+// Category schema
 const categorySchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  allocated: { type: Number, default: 0 },
-  spent: { type: Number, default: 0 }
+  name: { type: String, required: true, trim: true },
+  allocated: { type: Number, default: 0, min: 0 },
+  spent: { type: Number, default: 0, min: 0 },
 });
 
-const budgetSchema = new mongoose.Schema({
-  user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-  period: { type: String, enum: ["monthly", "weekly"], required: true },
+// Transaction schema
+const transactionSchema = new mongoose.Schema({
+  category: { type: String, required: true, trim: true },
+  amount: { type: Number, required: true, min: 0 },
+  description: { type: String, default: "", trim: true },
+  date: { type: Date, default: Date.now },
+});
 
-  // If monthly budget, store month number (1–12)
-  month: { type: Number }, 
+// Budget schema
+const budgetSchema = new mongoose.Schema(
+  {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
 
-  // If weekly budget, store week number (1–52)
-  week: { type: Number }, 
+    categories: {
+      type: [categorySchema],
+      default: [],
+    },
 
-  totalBudget: { type: Number, required: true },
-  categories: [categorySchema],
-  savingsGoal: { type: Number, default: 0 },
+    transactions: {
+      type: [transactionSchema],
+      default: [],
+    },
 
-  // Computed fields
-  totalAllocated: { type: Number, default: 0 },
-  totalSpent: { type: Number, default: 0 },
-  remaining: { type: Number, default: 0 }
-}, { timestamps: true });  // ✅ Adds createdAt & updatedAt automatically
+    totalBudget: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    totalSpent: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    remaining: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    period: {
+      type: String,
+      enum: ["monthly", "weekly", "yearly"],
+      required: true,
+    },
+    month: {
+      type: Number, // 1–12
+      min: 1,
+      max: 12,
+    },
+    week: {
+      type: Number, // 1–52
+      min: 1,
+      max: 52,
+    },
+
+    // Salary and savings tracking
+    salary: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    savingsGoal: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    savings: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+  },
+  { timestamps: true }
+);
 
 export default mongoose.model("Budget", budgetSchema);

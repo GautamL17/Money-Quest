@@ -25,14 +25,16 @@ export const deleteBudget = async (id) => {
   return data;
 };
 
-// ✅ Add spending to a budget
-export const addSpending = async (id, categoryName, amount) => {
+// ✅ Add spending with description
+export const addSpending = async (id, { category, amount, description }) => {
   const { data } = await axios.post(`/budgets/${id}/spend`, {
-    categoryName,
+    category,
     amount,
+    description,
   });
   return data;
 };
+
 
 // ✅ Get logged-in user info
 export const getMe = async () => {

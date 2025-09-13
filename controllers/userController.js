@@ -12,11 +12,11 @@ export const getAllUsers = async (req, res) => {
 
 export const updateUser = async (req, res) => {
   try {
-    const { username, email } = req.body;
+    const { name, email, salary } = req.body;
 
     const updatedUser = await User.findByIdAndUpdate(
       req.params.id,
-      { username, email },
+      { name, email, salary }, // 👈 include salary
       { new: true, runValidators: true }
     ).select("-password");
 
@@ -27,6 +27,7 @@ export const updateUser = async (req, res) => {
     res.status(500).json({ message: "Failed to update user" });
   }
 };
+
 
 // Delete user (self or admin)
 export const deleteUser = async (req, res) => {

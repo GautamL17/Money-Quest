@@ -1,7 +1,6 @@
 import express from 'express';
-import {addSpending,createBudget,deleteBudget,getBudgetById,getBudgetSummary,getBudgets,updateBudget} from '../controllers/budgetController.js'
 import { protect } from '../middleware/authMiddleware.js';
-
+import { createBudget, getBudgets, updateBudget, deleteBudget, addSpending, getBudgetSummary, getBudgetById } from '../controllers/budgetController.js';
 const router = express.Router();
 
 router.post('/',protect,createBudget);
