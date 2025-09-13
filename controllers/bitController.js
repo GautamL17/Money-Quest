@@ -1,5 +1,6 @@
 import Bit from '../models/bits.js';
 import User from '../models/user.js';
+import UserBitsProgress from "../models/userBitsProgress.js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { calculateLevel } from "../helpers/levelHelper.js";
 
@@ -187,9 +188,10 @@ Rules:
  * @desc Update user progress for a specific level and question
  * @route PATCH /api/bits/:id/progress
  */
+
 export const updateProgress = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { id } = req.params; // bitId
     const { level, questionIndex, isCorrect } = req.body;
 
     if (!['basic', 'intermediate', 'advanced'].includes(level)) {
@@ -197,41 +199,35 @@ export const updateProgress = async (req, res) => {
     }
 
     const bit = await Bit.findById(id);
-    if (!bit) {
-      return res.status(404).json({ error: "Bit not found" });
+    if (!bit) return res.status(404).json({ error: "Bit not found" });
+
+    // Fetch or create UserBitsProgress
+    let progress = await UserBitsProgress.findOne({ user: req.user._id, bit: id });
+    if (!progress) {
+      progress = new UserBitsProgress({ user: req.user._id, bit: id });
     }
 
-    // Update progress using the schema method
-    await bit.updateProgress(level, questionIndex, isCorrect);
+    // Update user progress
+    await progress.updateProgress(level, questionIndex, isCorrect);
 
-    // Check if all levels are completed and all questions are answered
-    const allLevels = ['basic', 'intermediate', 'advanced'];
-    const allCompleted = allLevels.every(level => {
-      const progress = bit.userProgress[level];
-      return progress.completed && progress.answeredQuestions.length === 5;
-    });
-
-    if (allCompleted) {
+    // Optionally update user's overall points if the bit is fully completed
+    const levelsCompleted = ['basic', 'intermediate', 'advanced'].every(lvl => progress.levels[lvl].completed);
+    if (levelsCompleted) {
       const user = await User.findById(req.user._id);
       const pointsEarned = 100;
       user.points += pointsEarned;
 
-      // Fetch user's completed bits and savings (implement savings logic as needed)
-      const completedBits = await Bit.countDocuments({
-        "userProgress.basic.completed": true,
-        "userProgress.intermediate.completed": true,
-        "userProgress.advanced.completed": true
+      const completedBits = await UserBitsProgress.countDocuments({
+        user: req.user._id,
+        'levels.basic.completed': true,
+        'levels.intermediate.completed': true,
+        'levels.advanced.completed': true
       });
-      // Example: get totalSavings from budgets or transactions
+
       const totalSavings = user.totalSavings || 0;
 
-      user.level = calculateLevel({
-        points: user.points,
-        completedBits,
-        totalSavings
-      });
+      user.level = calculateLevel({ points: user.points, completedBits, totalSavings });
 
-      // Rank logic (optional)
       if (user.points >= 1000) user.rank = "Pro";
       else if (user.points >= 500) user.rank = "Veteran";
       else user.rank = "Rookie";
@@ -241,14 +237,15 @@ export const updateProgress = async (req, res) => {
 
     res.json({
       message: "Progress updated successfully",
-      userProgress: bit.userProgress,
-      overallCompletion: bit.getOverallCompletion()
+      userProgress: progress.levels,
+      overallCompletion: progress.getOverallCompletion()
     });
   } catch (error) {
     console.error("Error updating progress:", error);
     res.status(500).json({ error: "Failed to update progress" });
   }
 };
+
 
 /**
  * @desc Get all Bits
@@ -304,32 +301,41 @@ export const deleteBit = async (req, res) => {
  */
 export const getAnalytics = async (req, res) => {
   try {
-    const bit = await Bit.findById(req.params.id);
-    if (!bit) {
-      return res.status(404).json({ error: "Bit not found" });
-    }
+    const { id } = req.params; // bitId
+
+    const bit = await Bit.findById(id);
+    if (!bit) return res.status(404).json({ error: "Bit not found" });
+
+    const progress = await UserBitsProgress.findOne({ user: req.user._id, bit: id });
 
     const analytics = {
-      overallCompletion: bit.getOverallCompletion(),
-      levelsCompleted: {
-        basic: bit.userProgress.basic.completed,
-        intermediate: bit.userProgress.intermediate.completed,
-        advanced: bit.userProgress.advanced.completed
-      },
-      levelsUnlocked: {
-        basic: true, // Always unlocked
-        intermediate: bit.isIntermediateUnlocked(),
-        advanced: bit.isAdvancedUnlocked()
-      },
-      scores: {
-        basic: bit.userProgress.basic.score,
-        intermediate: bit.userProgress.intermediate.score,
-        advanced: bit.userProgress.advanced.score
-      },
-      totalQuestionsAnswered: 
-        bit.userProgress.basic.answeredQuestions.length +
-        bit.userProgress.intermediate.answeredQuestions.length +
-        bit.userProgress.advanced.answeredQuestions.length
+      overallCompletion: progress ? progress.getOverallCompletion() : 0,
+      levelsCompleted: progress
+        ? {
+            basic: progress.levels.basic.completed,
+            intermediate: progress.levels.intermediate.completed,
+            advanced: progress.levels.advanced.completed
+          }
+        : { basic: false, intermediate: false, advanced: false },
+      levelsUnlocked: progress
+        ? {
+            basic: true,
+            intermediate: progress.levels.intermediate.unlocked,
+            advanced: progress.levels.advanced.unlocked
+          }
+        : { basic: true, intermediate: false, advanced: false },
+      scores: progress
+        ? {
+            basic: progress.levels.basic.score,
+            intermediate: progress.levels.intermediate.score,
+            advanced: progress.levels.advanced.score
+          }
+        : { basic: 0, intermediate: 0, advanced: 0 },
+      totalQuestionsAnswered: progress
+        ? progress.levels.basic.answeredQuestions.length +
+          progress.levels.intermediate.answeredQuestions.length +
+          progress.levels.advanced.answeredQuestions.length
+        : 0
     };
 
     res.json(analytics);

@@ -1,10 +1,8 @@
-// pages/Budget.jsx
 import { useState, useEffect, useMemo } from "react";
 import useBudgetStore from "../../store/useBudgetStore";
 import BudgetForm from "./BudgetForm";
 import BudgetOverview from "./BudgetOverview";
 import toast from "react-hot-toast";
-
 
 const defaultCategories = [
   "Food", "Transport", "Shopping", "Rent",
@@ -14,10 +12,8 @@ const defaultCategories = [
 const Budget = () => {
   const [goals, setGoals] = useState([]);
   const [newGoal, setNewGoal] = useState({ name: "", amount: "", category: "" });
-
   const [transaction, setTransaction] = useState({ category: "", amount: "", description: "" });
   const [selectedBudgetId, setSelectedBudgetId] = useState("");
-
   const [selectedPeriod, setSelectedPeriod] = useState("monthly");
   const [selectedWeek, setSelectedWeek] = useState(1);
 
@@ -42,7 +38,7 @@ const Budget = () => {
     return { income, spent, remaining: income - spent };
   }, [filteredBudgets]);
 
-  // Goals with progress bar
+  // Goals progress
   const goalsWithProgress = useMemo(() => {
     return goals.map(goal => {
       const progress = Math.min((summary.spent / goal.amount) * 100, 100);
@@ -50,50 +46,50 @@ const Budget = () => {
     });
   }, [goals, summary.spent]);
 
-  // === Goal handlers ===
+  // === Handlers ===
   const handleAddGoal = () => {
     if (!newGoal.name || !newGoal.amount || !newGoal.category) {
-      alert("Please fill all goal fields");
-      return;
+      return toast.error("Please fill all goal fields");
     }
     setGoals([...goals, { ...newGoal, amount: Number(newGoal.amount) }]);
     setNewGoal({ name: "", amount: "", category: "" });
   };
 
-  // === Transaction handler ===
-// === Transaction handler ===
-const handleAddTransaction = async () => {
-  if (!selectedBudgetId) return toast.error("Please select a budget");
-  if (!transaction.category) return toast.error("Please select a category");
-  if (!transaction.amount || Number(transaction.amount) <= 0)
-    return toast.error("Please enter a valid amount");
+  const handleAddTransaction = async () => {
+    if (!selectedBudgetId) return toast.error("Please select a budget");
+    if (!transaction.category) return toast.error("Please select a category");
+    if (!transaction.amount || Number(transaction.amount) <= 0)
+      return toast.error("Please enter a valid amount");
 
-  const selectedBudget = budgets.find((b) => b._id === selectedBudgetId);
-  if (!selectedBudget) return toast.error("Selected budget not found");
+    const selectedBudget = budgets.find((b) => b._id === selectedBudgetId);
+    if (!selectedBudget) return toast.error("Selected budget not found");
 
-  const normalizedCategory = transaction.category.trim();
-  const categoryExists = selectedBudget.categories.some(
-    (c) => c.name?.trim().toLowerCase() === normalizedCategory.toLowerCase()
-  );
-  if (!categoryExists) return toast.error(`Category "${normalizedCategory}" does not exist`);
+    const normalizedCategory = transaction.category.trim();
+    const categoryExists = selectedBudget.categories.some(
+      (c) => c.name?.trim().toLowerCase() === normalizedCategory.toLowerCase()
+    );
+    if (!categoryExists) return toast.error(`Category "${normalizedCategory}" does not exist`);
 
-  try {
-    await addSpending(selectedBudgetId, {
-      category: normalizedCategory,
-      amount: Number(transaction.amount),
-      description: transaction.description,
-    });
+    try {
+      await addSpending(selectedBudgetId, {
+        category: normalizedCategory,
+        amount: Number(transaction.amount),
+        description: transaction.description,
+      });
 
-    setTransaction({ category: "", amount: "", description: "" });
-    toast.success("Transaction added successfully ✅");
-  } catch (err) {
-    console.error("Error adding transaction:", err);
-    toast.error("Failed to add transaction ❌");
-  }
-};
+      // Optimistic update locally
+      setSelectedBudgetId(prev => prev); // trigger re-render
+      transaction.amount = Number(transaction.amount);
+      setTransaction({ category: "", amount: "", description: "" });
+      toast.success("Transaction added successfully ✅");
+    } catch (err) {
+      console.error("Error adding transaction:", err);
+      toast.error("Failed to add transaction ❌");
+    }
+  };
 
   return (
-    <div className="p-6 space-y-8">
+    <div className="p-6 space-y-8 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -127,7 +123,7 @@ const handleAddTransaction = async () => {
       {error && <p className="text-red-500">{error}</p>}
 
       {/* Summary */}
-      <div className="bg-zinc-800/50 p-4 rounded-lg border border-zinc-600 grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
+      <div className="bg-zinc-800/50 p-4 rounded-xl border border-zinc-700 grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
         <div>
           <h4 className="text-sm text-gray-400">Income</h4>
           <p className="text-lg font-bold text-green-400">₹{summary.income}</p>
@@ -146,32 +142,31 @@ const handleAddTransaction = async () => {
       <BudgetForm />
 
       {/* Transaction Form */}
-      <div className="bg-zinc-800 p-4 rounded-lg shadow-md space-y-3">
-        <h3 className="text-lg font-semibold">Add Transaction</h3>
+      <div className="bg-zinc-800 p-4 rounded-xl shadow-md space-y-3">
+        <h3 className="text-lg font-semibold text-white">Add Transaction</h3>
 
         <select
-          className="w-full border rounded p-2 bg-zinc-800"
+          className="w-full border rounded p-2 bg-zinc-900 text-white"
           value={selectedBudgetId}
           onChange={(e) => setSelectedBudgetId(e.target.value)}
         >
           <option value="">Select Budget</option>
           {filteredBudgets.map(b => (
             <option key={b._id} value={b._id}>
-              {b.period} Budget - ₹{b.totalBudget}
+              {b.period.charAt(0).toUpperCase() + b.period.slice(1)} Budget - ₹{b.totalBudget}
             </option>
           ))}
         </select>
 
         <select
-          className="w-full border rounded p-2 bg-zinc-800"
+          className="w-full border rounded p-2 bg-zinc-900 text-white"
           value={transaction.category}
           onChange={(e) => setTransaction({ ...transaction, category: e.target.value })}
           disabled={!selectedBudgetId}
         >
           <option value="">Select Category</option>
           {selectedBudgetId &&
-            filteredBudgets
-              .find(b => b._id === selectedBudgetId)
+            filteredBudgets.find(b => b._id === selectedBudgetId)
               ?.categories.map((c, idx) => (
                 <option key={idx} value={c.name}>
                   {c.name}
@@ -181,7 +176,7 @@ const handleAddTransaction = async () => {
 
         <input
           type="number"
-          className="w-full border rounded p-2 bg-zinc-800"
+          className="w-full border rounded p-2 bg-zinc-900 text-white"
           placeholder="Amount"
           value={transaction.amount}
           onChange={(e) => setTransaction({ ...transaction, amount: e.target.value })}
@@ -189,7 +184,7 @@ const handleAddTransaction = async () => {
 
         <input
           type="text"
-          className="w-full border rounded p-2 bg-zinc-800"
+          className="w-full border rounded p-2 bg-zinc-900 text-white"
           placeholder="Description (optional)"
           value={transaction.description}
           onChange={(e) => setTransaction({ ...transaction, description: e.target.value })}
@@ -197,7 +192,7 @@ const handleAddTransaction = async () => {
 
         <button
           onClick={handleAddTransaction}
-          className="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg"
+          className="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg transition-all"
         >
           Add Transaction
         </button>
@@ -218,7 +213,7 @@ const handleAddTransaction = async () => {
               </div>
               <div className="w-full bg-zinc-700 h-2 rounded">
                 <div
-                  className="h-2 rounded bg-green-500"
+                  className="h-2 rounded bg-green-500 transition-all"
                   style={{ width: `${goal.progress}%` }}
                 />
               </div>

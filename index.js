@@ -8,6 +8,8 @@ import featureRoutes from './routes/featureRoutes.js';
 import memeRoutes from './routes/memeRoutes.js';
 import budgetRoutes from './routes/budgetRoutes.js';
 import userRoutes from './routes/userRoutes.js';
+import dashboardRoutes from './routes/dashboardRoutes.js';
+import bitsProgress from './routes/bitsProgressRoutes.js';
 dotenv.config();
 connectDB();
 
@@ -22,8 +24,10 @@ app.use('/api/features', featureRoutes);
 app.use('/api/memes', memeRoutes);
 app.use('/api/budgets/',budgetRoutes);
 app.use('/api/users',userRoutes);
+app.use('/api/dashboard',dashboardRoutes);
+app.use('/api/bits-progress',bitsProgress);
 app.get('/', (req, res) => {
     res.end('Hello world');
 })
-const PORT = process.env.PORT | 8000;
+const PORT = process.env.PORT || 8000;
 app.listen(PORT, () => console.log(`Server is running at ${PORT}`));

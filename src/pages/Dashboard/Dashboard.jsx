@@ -1,125 +1,198 @@
-import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { PlusCircle, MinusCircle, Target, Wallet, Bell } from "lucide-react";
-import BudgetOverview from "./BudgetOverview";
-import BudgetForm from './BudgetForm';
+// src/pages/Dashboard.jsx
+import { useState, useEffect } from "react";
+import axios from "../../api/axios";
+import { format } from "date-fns";
+import toast from "react-hot-toast";
+import { FaCoins, FaWallet, FaChartLine, FaPiggyBank } from "react-icons/fa";
+
 const Dashboard = () => {
-  const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
+  const [dashboard, setDashboard] = useState(null);
+  const [userBitsProgress, setUserBitsProgress] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const expenseData = [
-    { name: "Food", value: 400 },
-    { name: "Rent", value: 700 },
-    { name: "Travel", value: 200 },
-    { name: "Entertainment", value: 150 },
-  ];
+  // Fetch dashboard + user bits progress
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [dashboardRes, bitsRes] = await Promise.all([
+          axios.get("/dashboard"),
+          axios.get("/bits-progress")
+        ]);
 
-  const incomeVsExpense = [
-    { month: "Jan", income: 4000, expense: 2400 },
-    { month: "Feb", income: 3000, expense: 1398 },
-    { month: "Mar", income: 5000, expense: 2800 },
-  ];
+        setDashboard(dashboardRes.data);
+        setUserBitsProgress(bitsRes.data || []);
+      } catch (err) {
+        console.error("Error fetching dashboard:", err);
+        setError("Failed to load dashboard");
+        toast.error("Failed to load dashboard ❌");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  if (loading)
+    return (
+      <div className="flex justify-center items-center h-screen text-gray-400">
+        Loading dashboard...
+      </div>
+    );
+  if (error)
+    return (
+      <div className="flex justify-center items-center h-screen text-red-500">
+        {error}
+      </div>
+    );
+
+  if (!dashboard) return null;
+
+  const {
+    balance,
+    incomeThisMonth,
+    expensesThisMonth,
+    budgetLeft,
+    expenseBreakdown,
+    incomeVsExpense,
+    recentTransactions,
+    goals,
+    bitsProgress
+  } = dashboard;
+
+  const masteredTopicsCount = userBitsProgress.filter(
+    (bit) => bit.levels.advanced.completed
+  ).length;
 
   return (
-    <div className="min-h-screen bg- text-white p-6">
+    <div className="p-6 space-y-8 min-h-screen bg-zinc-900 text-gray-200">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Welcome back 👋</h1>
-        <div className="flex items-center gap-4[#141515]">
-          <button className="bg-gray-800 p-2 rounded-full"><Bell size={20} /></button>
-          <div className="bg-gray-800 px-4 py-2 rounded-lg">Profile</div>
+      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-white">📊 Dashboard</h1>
+          <p className="text-gray-400 mt-1">
+            Overview of your budgets and learning progress
+          </p>
         </div>
+      </header>
+
+      {/* Stats Summary */}
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <StatCard label="Balance" value={`₹${balance}`} icon={<FaWallet />} color="blue" />
+        <StatCard label="Income (This Month)" value={`₹${incomeThisMonth}`} icon={<FaCoins />} color="green" />
+        <StatCard label="Expenses (This Month)" value={`₹${expensesThisMonth}`} icon={<FaChartLine />} color="red" />
+        <StatCard label="Budget Left" value={`₹${budgetLeft}`} icon={<FaPiggyBank />} color="yellow" />
       </div>
 
-      {/* Overview cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-gray-900 p-4 rounded-xl shadow">
-          <h2 className="text-gray-400 text-sm">Total Balance</h2>
-          <p className="text-2xl font-bold">₹12,500</p>
-        </div>
-        <div className="bg-gray-900 p-4 rounded-xl shadow">
-          <h2 className="text-gray-400 text-sm">Income (This Month)</h2>
-          <p className="text-2xl font-bold text-green-400">₹8,000</p>
-        </div>
-        <div className="bg-gray-900 p-4 rounded-xl shadow">
-          <h2 className="text-gray-400 text-sm">Expenses (This Month)</h2>
-          <p className="text-2xl font-bold text-red-400">₹5,200</p>
-        </div>
-        <div className="bg-gray-900 p-4 rounded-xl shadow">
-          <h2 className="text-gray-400 text-sm">Budget Left</h2>
-          <p className="text-2xl font-bold text-yellow-400">₹2,800</p>
-        </div>
-      </div>
+      {/* Expense Breakdown */}
+      <SectionCard title="Expense Breakdown">
+        {expenseBreakdown.length === 0 ? (
+          <p className="text-gray-400">No expenses yet</p>
+        ) : (
+          <ul className="space-y-2">
+            {expenseBreakdown.map((e, idx) => (
+              <li key={idx} className="flex justify-between p-2 hover:bg-zinc-800 rounded">
+                <span>{e.name}</span>
+                <span>₹{e.value}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </SectionCard>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div className="bg-gray-900 p-4 rounded-xl shadow">
-          <h2 className="mb-4 font-semibold">Expense Breakdown</h2>
-          <ResponsiveContainer width="100%" height={250}>
-            <PieChart>
-              <Pie
-                data={expenseData}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                outerRadius={80}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {expenseData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="bg-gray-900 p-4 rounded-xl shadow">
-          <h2 className="mb-4 font-semibold">Income vs Expense</h2>
-          <ResponsiveContainer width="100%" height={250}>
-            <LineChart data={incomeVsExpense}>
-              <XAxis dataKey="month" stroke="#ccc" />
-              <YAxis stroke="#ccc" />
-              <Tooltip />
-              <Line type="monotone" dataKey="income" stroke="#00C49F" />
-              <Line type="monotone" dataKey="expense" stroke="#FF8042" />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+      {/* Income vs Expense */}
+      <SectionCard title="Income vs Expense (Last 6 months)">
+        <table className="w-full text-left text-gray-200 border-collapse">
+          <thead>
+            <tr className="border-b border-zinc-700">
+              <th className="p-2">Month</th>
+              <th className="p-2">Income</th>
+              <th className="p-2">Expense</th>
+            </tr>
+          </thead>
+          <tbody>
+            {incomeVsExpense.map((ie, idx) => (
+              <tr key={idx} className="hover:bg-zinc-800">
+                <td className="p-2">{ie.month}</td>
+                <td className="p-2">₹{ie.income}</td>
+                <td className="p-2">₹{ie.expense}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </SectionCard>
 
       {/* Recent Transactions */}
-      <div className="bg-gray-900 p-4 rounded-xl shadow mb-6">
-        <h2 className="mb-4 font-semibold">Recent Transactions</h2>
-        <ul className="divide-y divide-gray-700">
-          <li className="flex justify-between py-2">
-            <span>Groceries</span>
-            <span className="text-red-400">-₹500</span>
-          </li>
-          <li className="flex justify-between py-2">
-            <span>Salary</span>
-            <span className="text-green-400">+₹10,000</span>
-          </li>
-          <li className="flex justify-between py-2">
-            <span>Netflix</span>
-            <span className="text-red-400">-₹200</span>
-          </li>
-        </ul>
-      </div>
+      <SectionCard title="Recent Transactions">
+        {recentTransactions.length === 0 ? (
+          <p className="text-gray-400">No transactions yet</p>
+        ) : (
+          <ul className="space-y-2 max-h-56 overflow-y-auto">
+            {recentTransactions.map((t, idx) => (
+              <li key={idx} className="flex justify-between border-b border-zinc-700 pb-1 hover:bg-zinc-800 rounded px-2">
+                <div>
+                  <p className="font-medium">{t.category}</p>
+                  <p className="text-xs text-gray-400">{t.description}</p>
+                </div>
+                <div className="text-right">
+                  <p className={t.amount > 0 ? "text-green-400" : "text-red-400"}>
+                    {t.amount > 0 ? `+₹${t.amount}` : `-₹${Math.abs(t.amount)}`}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {t.createdAt ? format(new Date(t.createdAt), "dd MMM") : "N/A"}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </SectionCard>
 
-      {/* Quick Actions */}
-      <div className="flex gap-4">
-        <button className="flex items-center gap-2 bg-green-600 px-4 py-2 rounded-lg hover:bg-green-500">
-          <PlusCircle size={18} /> Add Income
-        </button>
-        <button className="flex items-center gap-2 bg-red-600 px-4 py-2 rounded-lg hover:bg-red-500">
-          <MinusCircle size={18} /> Add Expense
-        </button>
-        <button className="flex items-center gap-2 bg-yellow-600 px-4 py-2 rounded-lg hover:bg-yellow-500">
-          <Target size={18} /> Set Goal
-        </button>
-        <button className="flex items-center gap-2 bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-500">
-          <Wallet size={18} /> Set Budget
-        </button>
-      </div>
+      {/* Bits Progress */}
+      <SectionCard title="Learning Progress">
+        <p className="text-gray-200 mb-2">
+          Mastered Topics: {masteredTopicsCount} / {bitsProgress.totalBits}
+        </p>
+        <div className="w-full bg-zinc-700 h-4 rounded mb-4 overflow-hidden">
+          <div
+            className="h-4 rounded bg-green-500 transition-all duration-500"
+            style={{ width: `${bitsProgress.avgCompletion}%` }}
+          />
+        </div>
+        <ul className="space-y-1 max-h-40 overflow-y-auto text-gray-200">
+          {bitsProgress.items.map((b, idx) => (
+            <li key={idx} className="flex justify-between p-1 hover:bg-zinc-800 rounded">
+              <span>{b.title} ({b.category})</span>
+              <span>{b.overallCompletion}%</span>
+            </li>
+          ))}
+        </ul>
+      </SectionCard>
+    </div>
+  );
+};
+
+// Reusable section wrapper
+const SectionCard = ({ title, children }) => (
+  <div className="bg-zinc-900 p-4 rounded-lg shadow-md">
+    <h3 className="text-lg font-semibold text-white mb-2">{title}</h3>
+    {children}
+  </div>
+);
+
+// Reusable stat card
+const StatCard = ({ label, value, icon, color }) => {
+  const colorClass = color === "green" ? "text-green-400" :
+                     color === "red" ? "text-red-400" :
+                     color === "blue" ? "text-blue-400" :
+                     color === "yellow" ? "text-yellow-400" : "text-white";
+
+  return (
+    <div className="bg-zinc-900 p-4 rounded-lg shadow-md flex flex-col items-center justify-center gap-2 hover:scale-105 transition-transform duration-300">
+      <div className={`text-2xl ${colorClass}`}>{icon}</div>
+      <p className="text-gray-400">{label}</p>
+      <p className={`text-xl font-bold ${colorClass}`}>{value}</p>
     </div>
   );
 };

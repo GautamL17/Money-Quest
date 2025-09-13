@@ -20,3 +20,14 @@ export const getMe = async () => {
   const { data } = await axios.get("/users/me");
   return data;
 };
+
+
+export const getBitProgress = async (bitId) => {
+  const { data } = await axios.get(`/bits/${bitId}/progress`);
+  return data;
+};
+
+export const submitAnswer = async (bitId, payload) => {
+  const { data } = await axios.post(`/bits/${bitId}/answer`, payload);
+  return data;
+};
